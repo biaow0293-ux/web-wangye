@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DeepSeek API 极简入门工作台</title>
+    <meta name="description" content="让零基础用户 5 分钟内完成第一次 DeepSeek API 调用的交互式教学网页。" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <div class="brand">DeepSeek API 极简入门工作台</div>
+          <h1>5 分钟完成第一次大模型 API 调用</h1>
+          <p>从获取密钥、测试连接、选择模型，到可视化构造请求和查看流式输出。面向完全不懂代码的人，也保留面试展示需要的技术深度。</p>
+        </div>
+        <div class="top-actions">
+          <button id="resetDemo" class="ghost-btn" type="button">重置演示</button>
+          <label class="mode-switch">
+            <input id="expertMode" type="checkbox" />
+            <span>专家模式</span>
+          </label>
+        </div>
+      </header>
+
+      <main>
+        <section class="wizard" aria-labelledby="wizard-title">
+          <div class="section-heading">
+            <h2 id="wizard-title">分步配置向导</h2>
+            <button id="replayTutorial" class="text-btn" type="button">回看教程</button>
+          </div>
+          <div class="steps">
+            <article class="step-card active" data-step="1">
+              <div class="step-num">1</div>
+              <h3>获取密钥</h3>
+              <p>打开 DeepSeek 开放平台，进入 API Keys，点击创建。密钥只出现一次，记得先复制。</p>
+              <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer" class="inline-link">打开 DeepSeek API Keys</a>
+              <div class="gif-panel">
+                <div class="record-dot"></div>
+                <span>演示：官网 → API Keys → 创建 Key → 复制</span>
+              </div>
+            </article>
+            <article class="step-card" data-step="2">
+              <div class="step-num">2</div>
+              <h3>粘贴并测试</h3>
+              <p>可使用后端环境变量，也可以临时粘贴自己的 Key。页面会本地加密保存，并在 7 天后提醒更新。</p>
+              <div class="key-row">
+                <input id="apiKey" type="password" autocomplete="off" placeholder="sk-..." />
+                <button id="toggleKey" class="icon-btn" type="button" aria-label="显示或隐藏密钥">👁</button>
+                <button id="testKey" type="button">测试连接</button>
+              </div>
+              <div id="keyStatus" class="status muted">还未测试连接</div>
+            </article>
+            <article class="step-card" data-step="3">
+              <div class="step-num">3</div>
+              <h3>选择模型</h3>
+              <p>新手建议先用 deepseek-chat；复杂推理、代码分析再切换 reasoner。</p>
+              <select id="modelSelect"></select>
+              <div id="modelInfo" class="model-info"></div>
+            </article>
+          </div>
+          <div id="stuckHint" class="hint-bar">提示：如果你停在某一步超过 20 秒，我会给出下一步建议。</div>
+        </section>
+
+        <section class="builder" aria-label="可视化请求构造器">
+          <aside class="panel params-panel">
+            <div class="panel-head">
+              <h2>参数面板</h2>
+              <span class="pill">不用写代码</span>
+            </div>
+            <label>
+              系统提示词
+              <textarea id="systemPrompt" rows="4">你是一个耐心、清晰的中文 AI 助手。回答时先给结论，再给步骤。</textarea>
+            </label>
+            <label>
+              我的问题
+              <textarea id="userPrompt" rows="6" placeholder="例如：帮我写一篇小红书风格的咖啡店探店文案。"></textarea>
+            </label>
+            <div class="prompt-helper">
+              <input id="roughIdea" placeholder="模糊想法：帮我写个小红书文案" />
+              <button id="helpPrompt" type="button">AI 帮我写提示词</button>
+            </div>
+            <label class="range-label">
+              创意程度 <strong id="tempValue">0.7</strong>
+              <input id="temperature" type="range" min="0" max="2" step="0.1" value="0.7" />
+              <small>越低越稳，越高越发散。写作可高一点，事实分析建议低一点。</small>
+            </label>
+            <label class="range-label">
+              回复长度 <strong id="maxTokensValue">800</strong>
+              <input id="maxTokens" type="range" min="64" max="4096" step="64" value="800" />
+              <small>数字越大，模型最多能说得越长，也会消耗更多 tokens。</small>
+            </label>
+            <div id="expertFields" class="expert-fields hidden">
+              <label>
+                Base URL
+                <input id="baseUrlView" disabled value="https://api.deepseek.com" />
+              </label>
+              <label>
+                月度预算上限（元）
+                <input id="budgetLimit" type="number" min="0" step="0.1" value="5" />
+              </label>
+            </div>
+            <button id="sendRequest" class="primary-btn" type="button">发送流式请求</button>
+          </aside>
+
+          <section class="panel preview-panel">
+            <div class="panel-head">
+              <h2>实时请求预览</h2>
+              <span id="changedField" class="pill subtle">等待输入</span>
+            </div>
+            <pre id="jsonPreview"><code></code></pre>
+          </section>
+
+          <section class="panel result-panel">
+            <div class="panel-head">
+              <h2>对话结果</h2>
+              <button id="clearResult" class="text-btn" type="button">清空</button>
+            </div>
+            <div class="metrics">
+              <div><span id="firstToken">--</span><small>首 Token 延迟</small></div>
+              <div><span id="totalTime">--</span><small>总耗时</small></div>
+              <div><span id="tokenCost">--</span><small>本轮费用</small></div>
+            </div>
+            <div id="resultBox" class="result-box" aria-live="polite">输出会像打字机一样出现在这里。</div>
+          </section>
+        </section>
+
+        <section class="learning-grid">
+          <article class="usage-card">
+            <h2>用量与预算</h2>
+            <div class="usage-line"><span>累计 tokens</span><strong id="totalTokens">0</strong></div>
+            <div class="usage-line"><span>累计估算费用</span><strong id="totalCost">¥0.000000</strong></div>
+            <div class="budget-track"><span id="budgetFill"></span></div>
+            <div id="budgetHint" class="status muted">预算健康。</div>
+          </article>
+          <article class="lesson-card">
+            <h2>今日学习要点</h2>
+            <p id="lessonText">完成一次成功调用后，这里会出现一条小知识。</p>
+          </article>
+          <article class="history-card">
+            <div class="panel-head">
+              <h2>本地历史</h2>
+              <button id="clearHistory" class="text-btn" type="button">清除</button>
+            </div>
+            <div id="historyList" class="history-list"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="/assets/app.js"></script>
+  </body>
+</html>
